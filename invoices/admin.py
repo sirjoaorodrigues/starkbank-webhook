@@ -1,5 +1,21 @@
 from django.contrib import admin
-from .models import Invoice, Transfer, WebhookEvent
+from .models import Invoice, Transfer, WebhookEvent, InvoiceCampaign
+
+
+@admin.register(InvoiceCampaign)
+class InvoiceCampaignAdmin(admin.ModelAdmin):
+    list_display = ['id', 'is_active', 'execution_count', 'max_executions', 'started_at']
+    list_filter = ['is_active', 'started_at']
+    readonly_fields = ['started_at', 'execution_count']
+    actions = ['deactivate_campaigns', 'activate_campaigns']
+
+    @admin.action(description='Deactivate selected campaigns')
+    def deactivate_campaigns(self, request, queryset):
+        queryset.update(is_active=False)
+
+    @admin.action(description='Activate selected campaigns')
+    def activate_campaigns(self, request, queryset):
+        queryset.update(is_active=True)
 
 
 @admin.register(Invoice)

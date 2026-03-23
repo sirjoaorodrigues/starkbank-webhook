@@ -1,6 +1,32 @@
 from django.db import models
 
 
+class InvoiceCampaign(models.Model):
+    """Model to track invoice issuance campaigns."""
+
+    started_at = models.DateTimeField(auto_now_add=True)
+    execution_count = models.PositiveIntegerField(default=0)
+    max_executions = models.PositiveIntegerField(default=8)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f'Campaign {self.id} - {self.execution_count}/{self.max_executions} executions'
+
+    def increment_and_check(self):
+        """Increment counter and deactivate if max reached. Returns True if was executed."""
+        if not self.is_active or self.execution_count >= self.max_executions:
+            return False
+
+        self.execution_count += 1
+        if self.execution_count >= self.max_executions:
+            self.is_active = False
+        self.save()
+        return True
+
+
 class Invoice(models.Model):
     """Model to track invoices created in Stark Bank."""
 
