@@ -70,6 +70,7 @@ def create_transfer(amount: int, invoice_starkbank_id: str) -> starkbank.Transfe
 class APIKeyUser:
     """Fake user for API Key authentication."""
     is_authenticated = True
+    pk = 'api_key_user'
 
 
 class APIKeyAuthentication(authentication.BaseAuthentication):

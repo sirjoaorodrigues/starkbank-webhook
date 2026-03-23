@@ -1,13 +1,20 @@
 import random
 import logging
 from celery import shared_task
+from django.conf import settings
 from .models import Invoice, Transfer, InvoiceCampaign
 from .services import create_invoices, create_transfer
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=settings.CELERY_RETRY_BACKOFF,
+    retry_backoff_max=settings.CELERY_RETRY_BACKOFF_MAX,
+    retry_kwargs={'max_retries': settings.CELERY_RETRY_MAX},
+    retry_jitter=True,
+)
 def issue_invoices():
     """Task to issue 8-12 random invoices."""
     campaign = InvoiceCampaign.objects.filter(is_active=True).first()
@@ -47,7 +54,13 @@ def issue_invoices():
         raise
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=settings.CELERY_RETRY_BACKOFF,
+    retry_backoff_max=settings.CELERY_RETRY_BACKOFF_MAX,
+    retry_kwargs={'max_retries': settings.CELERY_RETRY_MAX},
+    retry_jitter=True,
+)
 def process_invoice_credit(invoice_id: str, amount: int, fee: int):
     """Process a paid invoice and create a transfer."""
     logger.info(f'Processing invoice credit: {invoice_id}, amount: {amount}, fee: {fee}')

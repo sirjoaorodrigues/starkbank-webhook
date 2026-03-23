@@ -2,8 +2,19 @@
 Django settings for starkbank_webhook project.
 """
 
+import sentry_sdk
 from pathlib import Path
 from decouple import config, Csv
+
+SENTRY_DSN = config('SENTRY_DSN', default='')
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=config('SENTRY_TRACES_SAMPLE_RATE', default=0.1, cast=float),
+        profiles_sample_rate=config('SENTRY_PROFILES_SAMPLE_RATE', default=0.1, cast=float),
+        send_default_pii=False,
+        environment=config('SENTRY_ENVIRONMENT', default='development'),
+    )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -93,6 +104,15 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.JSONParser',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': config('THROTTLE_RATE_ANON', default='100/hour'),
+        'user': config('THROTTLE_RATE_USER', default='1000/hour'),
+        'webhook': config('THROTTLE_RATE_WEBHOOK', default='60/minute'),
+    },
 }
 
 # DRF Spectacular
@@ -119,6 +139,10 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'America/Sao_Paulo'
+
+CELERY_RETRY_BACKOFF = config('CELERY_RETRY_BACKOFF', default=60, cast=int)
+CELERY_RETRY_BACKOFF_MAX = config('CELERY_RETRY_BACKOFF_MAX', default=600, cast=int)
+CELERY_RETRY_MAX = config('CELERY_RETRY_MAX', default=5, cast=int)
 
 STARKBANK_ENVIRONMENT = config('STARKBANK_ENVIRONMENT', default='sandbox')
 STARKBANK_PROJECT_ID = config('STARKBANK_PROJECT_ID', default='')

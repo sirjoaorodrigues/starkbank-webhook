@@ -4,6 +4,7 @@ from django.conf import settings
 from rest_framework import viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from .models import Invoice, Transfer, WebhookEvent
@@ -27,30 +28,30 @@ API_KEY_HEADER = OpenApiParameter(
     list=extend_schema(parameters=[API_KEY_HEADER]),
     retrieve=extend_schema(parameters=[API_KEY_HEADER]),
 )
-class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
+class APIKeyProtectedViewSet(viewsets.ReadOnlyModelViewSet):
+    """Base ViewSet with API Key authentication."""
+    authentication_classes = [APIKeyAuthentication]
+    permission_classes = [HasValidAPIKey]
+
+
+class InvoiceViewSet(APIKeyProtectedViewSet):
     """ViewSet for listing and retrieving invoices."""
     queryset = Invoice.objects.all()
     serializer_class = InvoiceSerializer
-    authentication_classes = [APIKeyAuthentication]
-    permission_classes = [HasValidAPIKey]
 
 
-@extend_schema_view(
-    list=extend_schema(parameters=[API_KEY_HEADER]),
-    retrieve=extend_schema(parameters=[API_KEY_HEADER]),
-)
-class TransferViewSet(viewsets.ReadOnlyModelViewSet):
+class TransferViewSet(APIKeyProtectedViewSet):
     """ViewSet for listing and retrieving transfers."""
     queryset = Transfer.objects.all()
     serializer_class = TransferSerializer
-    authentication_classes = [APIKeyAuthentication]
-    permission_classes = [HasValidAPIKey]
 
 
 class WebhookCallbackView(APIView):
     """Endpoint to receive webhook callbacks from Stark Bank."""
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'webhook'
 
     @extend_schema(
         parameters=[
