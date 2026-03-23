@@ -5,10 +5,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .models import Invoice, Transfer, WebhookEvent
 from .serializers import InvoiceSerializer, TransferSerializer
-from .services import get_starkbank_project
+from .services import get_starkbank_project, APIKeyAuthentication, HasValidAPIKey
 from .tasks import process_invoice_credit
 from .exceptions import MissingSignatureError, InvalidSignatureError, WebhookProcessingError
-from .authentication import APIKeyAuthentication, HasValidAPIKey
 
 logger = logging.getLogger(__name__)
 
