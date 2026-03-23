@@ -18,3 +18,9 @@ class WebhookProcessingError(APIException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     default_detail = 'Error processing webhook'
     default_code = 'webhook_processing_error'
+
+
+class IPNotAllowedError(APIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_detail = 'IP address not allowed'
+    default_code = 'ip_not_allowed'

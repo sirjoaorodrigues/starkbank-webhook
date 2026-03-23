@@ -3,6 +3,7 @@ import starkbank
 from django.conf import settings
 from faker import Faker
 from rest_framework import authentication, exceptions, permissions
+from drf_spectacular.extensions import OpenApiAuthenticationExtension
 
 fake = Faker('pt_BR')
 
@@ -84,6 +85,19 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed('Invalid API Key')
 
         return (APIKeyUser(), None)
+
+
+class APIKeyAuthenticationScheme(OpenApiAuthenticationExtension):
+    """OpenAPI schema extension for API Key authentication."""
+    target_class = 'invoices.services.APIKeyAuthentication'
+    name = 'ApiKeyAuth'
+
+    def get_security_definition(self, auto_schema):
+        return {
+            'type': 'apiKey',
+            'in': 'header',
+            'name': 'X-API-Key',
+        }
 
 
 class HasValidAPIKey(permissions.BasePermission):

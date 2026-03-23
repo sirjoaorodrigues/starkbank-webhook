@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'drf_spectacular',
     'django_celery_beat',
     'invoices',
 ]
@@ -91,6 +92,25 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# DRF Spectacular
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Stark Bank Webhook API',
+    'DESCRIPTION': 'API for processing Stark Bank invoice webhooks and transfers',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SECURITY': [{'ApiKeyAuth': []}],
+    'COMPONENTS': {
+        'securitySchemes': {
+            'ApiKeyAuth': {
+                'type': 'apiKey',
+                'in': 'header',
+                'name': 'X-API-Key',
+            },
+        },
+    },
 }
 
 CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/0')
@@ -113,3 +133,6 @@ TRANSFER_ACCOUNT_TYPE = config('TRANSFER_ACCOUNT_TYPE', default='payment')
 
 # API Authentication
 API_KEY = config('API_KEY', default='')
+
+# Webhook IP Whitelist (comma-separated, empty = disabled)
+WEBHOOK_IP_WHITELIST = config('WEBHOOK_IP_WHITELIST', default='', cast=Csv())

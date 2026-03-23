@@ -14,3 +14,6 @@ CELERY_TASK_EAGER_PROPAGATES = True
 
 # Test API Key
 API_KEY = 'test-api-key'
+
+# Disable IP whitelist for tests
+WEBHOOK_IP_WHITELIST = []

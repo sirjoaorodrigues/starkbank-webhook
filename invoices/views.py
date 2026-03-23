@@ -1,17 +1,32 @@
 import logging
 import starkbank
+from django.conf import settings
 from rest_framework import viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 from .models import Invoice, Transfer, WebhookEvent
 from .serializers import InvoiceSerializer, TransferSerializer
 from .services import get_starkbank_project, APIKeyAuthentication, HasValidAPIKey
 from .tasks import process_invoice_credit
-from .exceptions import MissingSignatureError, InvalidSignatureError, WebhookProcessingError
+from .exceptions import MissingSignatureError, InvalidSignatureError, WebhookProcessingError, IPNotAllowedError
 
 logger = logging.getLogger(__name__)
 
+API_KEY_HEADER = OpenApiParameter(
+    name='X-API-Key',
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.HEADER,
+    required=True,
+    description='API Key for authentication'
+)
 
+
+@extend_schema_view(
+    list=extend_schema(parameters=[API_KEY_HEADER]),
+    retrieve=extend_schema(parameters=[API_KEY_HEADER]),
+)
 class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for listing and retrieving invoices."""
     queryset = Invoice.objects.all()
@@ -20,6 +35,10 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [HasValidAPIKey]
 
 
+@extend_schema_view(
+    list=extend_schema(parameters=[API_KEY_HEADER]),
+    retrieve=extend_schema(parameters=[API_KEY_HEADER]),
+)
 class TransferViewSet(viewsets.ReadOnlyModelViewSet):
     """ViewSet for listing and retrieving transfers."""
     queryset = Transfer.objects.all()
@@ -33,16 +52,47 @@ class WebhookCallbackView(APIView):
     authentication_classes = []
     permission_classes = []
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name='Digital-Signature',
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.HEADER,
+                required=True,
+                description='Stark Bank digital signature'
+            )
+        ],
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT},
+    )
     def post(self, request):
         try:
+            self._validate_ip(request)
             event = self._parse_event(request)
             self._process_event(event)
             return Response({'status': 'ok'})
-        except (MissingSignatureError, InvalidSignatureError):
+        except (MissingSignatureError, InvalidSignatureError, IPNotAllowedError):
             raise
         except Exception as e:
             logger.error(f'Error processing webhook: {e}')
             raise WebhookProcessingError()
+
+    @staticmethod
+    def _get_client_ip(request):
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0].strip()
+        return request.META.get('REMOTE_ADDR')
+
+    def _validate_ip(self, request):
+        whitelist = settings.WEBHOOK_IP_WHITELIST
+        if not whitelist or whitelist == ['']:
+            return
+
+        client_ip = self._get_client_ip(request)
+        if client_ip not in whitelist:
+            logger.warning(f'Webhook request from non-whitelisted IP: {client_ip}')
+            raise IPNotAllowedError()
 
     @staticmethod
     def _parse_event(request):

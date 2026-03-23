@@ -314,3 +314,105 @@ class WebhookCallbackTest(APITestCase):
         event = WebhookEvent.objects.get(event_id='new-event-123')
         self.assertEqual(event.event_type, 'boleto')
         self.assertFalse(event.processed)
+
+
+class WebhookIPWhitelistTest(APITestCase):
+    """Tests for webhook IP whitelist functionality."""
+
+    @patch('invoices.views.settings')
+    @patch('invoices.views.get_starkbank_project')
+    def test_webhook_blocked_ip(self, mock_get_project, mock_settings):
+        mock_settings.WEBHOOK_IP_WHITELIST = ['1.2.3.4', '5.6.7.8']
+
+        response = self.client.post(
+            '/api/webhook/',
+            data={'event': 'test'},
+            format='json',
+            HTTP_DIGITAL_SIGNATURE='valid-signature',
+            REMOTE_ADDR='9.9.9.9'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['detail'], 'IP address not allowed')
+
+    @patch('invoices.views.settings')
+    @patch('invoices.views.get_starkbank_project')
+    def test_webhook_allowed_ip(self, mock_get_project, mock_settings):
+        mock_settings.WEBHOOK_IP_WHITELIST = ['127.0.0.1', '5.6.7.8']
+
+        response = self.client.post(
+            '/api/webhook/',
+            data={'event': 'test'},
+            format='json',
+            REMOTE_ADDR='127.0.0.1'
+        )
+
+        # Will fail on signature, but IP check passed
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], 'Missing signature')
+
+    @patch('invoices.views.settings')
+    @patch('invoices.views.get_starkbank_project')
+    def test_webhook_whitelist_disabled(self, mock_get_project, mock_settings):
+        mock_settings.WEBHOOK_IP_WHITELIST = []
+
+        response = self.client.post(
+            '/api/webhook/',
+            data={'event': 'test'},
+            format='json',
+            REMOTE_ADDR='9.9.9.9'
+        )
+
+        # IP check disabled, will fail on signature
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], 'Missing signature')
+
+    @patch('invoices.views.settings')
+    @patch('invoices.views.get_starkbank_project')
+    def test_webhook_whitelist_empty_string(self, mock_get_project, mock_settings):
+        mock_settings.WEBHOOK_IP_WHITELIST = ['']
+
+        response = self.client.post(
+            '/api/webhook/',
+            data={'event': 'test'},
+            format='json',
+            REMOTE_ADDR='9.9.9.9'
+        )
+
+        # IP check disabled for empty string, will fail on signature
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], 'Missing signature')
+
+    @patch('invoices.views.settings')
+    @patch('invoices.views.get_starkbank_project')
+    def test_webhook_x_forwarded_for_header(self, mock_get_project, mock_settings):
+        mock_settings.WEBHOOK_IP_WHITELIST = ['10.0.0.1']
+
+        response = self.client.post(
+            '/api/webhook/',
+            data={'event': 'test'},
+            format='json',
+            HTTP_X_FORWARDED_FOR='10.0.0.1, 192.168.1.1',
+            REMOTE_ADDR='127.0.0.1'
+        )
+
+        # X-Forwarded-For takes precedence, IP check passed
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], 'Missing signature')
+
+    @patch('invoices.views.settings')
+    @patch('invoices.views.get_starkbank_project')
+    def test_webhook_x_forwarded_for_blocked(self, mock_get_project, mock_settings):
+        mock_settings.WEBHOOK_IP_WHITELIST = ['10.0.0.1']
+
+        response = self.client.post(
+            '/api/webhook/',
+            data={'event': 'test'},
+            format='json',
+            HTTP_X_FORWARDED_FOR='9.9.9.9, 192.168.1.1',
+            REMOTE_ADDR='10.0.0.1'
+        )
+
+        # X-Forwarded-For takes precedence, IP blocked
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['detail'], 'IP address not allowed')
