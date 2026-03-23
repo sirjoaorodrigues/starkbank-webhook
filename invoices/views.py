@@ -82,7 +82,7 @@ class WebhookCallbackView(APIView):
     def _get_client_ip(request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
-            return x_forwarded_for.split(',')[0].strip()
+            return x_forwarded_for.split(',')[-1].strip()
         return request.META.get('REMOTE_ADDR')
 
     def _validate_ip(self, request):
@@ -113,16 +113,18 @@ class WebhookCallbackView(APIView):
             raise InvalidSignatureError()
 
     def _process_event(self, event):
-        if WebhookEvent.objects.filter(event_id=event.id).exists():
+        _, created = WebhookEvent.objects.get_or_create(
+            event_id=event.id,
+            defaults={
+                'event_type': event.subscription,
+                'payload': {'log': str(event.log)},
+                'processed': False
+            }
+        )
+
+        if not created:
             logger.info(f'Event {event.id} already processed')
             return
-
-        WebhookEvent.objects.create(
-            event_id=event.id,
-            event_type=event.subscription,
-            payload={'log': str(event.log)},
-            processed=False
-        )
 
         if event.subscription == 'invoice' and hasattr(event.log, 'invoice'):
             self._handle_invoice_event(event)

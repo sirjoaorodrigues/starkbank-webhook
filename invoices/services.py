@@ -1,4 +1,5 @@
 import random
+import secrets
 import starkbank
 from django.conf import settings
 from faker import Faker
@@ -82,7 +83,7 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
         if not api_key:
             return None
 
-        if api_key != settings.API_KEY:
+        if not secrets.compare_digest(api_key, settings.API_KEY):
             raise exceptions.AuthenticationFailed('Invalid API Key')
 
         return (APIKeyUser(), None)
