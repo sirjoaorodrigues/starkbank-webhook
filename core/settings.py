@@ -144,6 +144,13 @@ CELERY_RETRY_BACKOFF = config('CELERY_RETRY_BACKOFF', default=60, cast=int)
 CELERY_RETRY_BACKOFF_MAX = config('CELERY_RETRY_BACKOFF_MAX', default=600, cast=int)
 CELERY_RETRY_MAX = config('CELERY_RETRY_MAX', default=5, cast=int)
 
+CELERY_BEAT_SCHEDULE = {
+    'issue-invoices-every-3-hours': {
+        'task': 'invoices.tasks.issue_invoices',
+        'schedule': 3 * 60 * 60,  # 3 hours in seconds
+    },
+}
+
 STARKBANK_ENVIRONMENT = config('STARKBANK_ENVIRONMENT', default='sandbox')
 STARKBANK_PROJECT_ID = config('STARKBANK_PROJECT_ID', default='')
 STARKBANK_PRIVATE_KEY_PATH = config('STARKBANK_PRIVATE_KEY_PATH', default='')
