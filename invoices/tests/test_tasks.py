@@ -1,10 +1,16 @@
 from unittest.mock import patch, MagicMock
 from django.test import TestCase
-from invoices.models import Invoice, Transfer
+from invoices.models import Invoice, Transfer, InvoiceCampaign
 from invoices.tasks import issue_invoices, process_invoice_credit
 
 
 class IssueInvoicesTaskTest(TestCase):
+
+    def setUp(self):
+        self.campaign = InvoiceCampaign.objects.create(
+            max_executions=8,
+            is_active=True
+        )
 
     @patch('invoices.tasks.create_invoices')
     def test_issue_invoices_creates_records(self, mock_create_invoices):
@@ -19,6 +25,8 @@ class IssueInvoicesTaskTest(TestCase):
             result = issue_invoices()
 
         self.assertEqual(result['created'], 1)
+        self.assertEqual(result['campaign_id'], self.campaign.id)
+        self.assertEqual(result['execution'], 1)
         self.assertEqual(Invoice.objects.count(), 1)
         invoice = Invoice.objects.first()
         self.assertEqual(invoice.starkbank_id, '123456789')
@@ -28,11 +36,10 @@ class IssueInvoicesTaskTest(TestCase):
     def test_issue_invoices_count_range(self, mock_create_invoices):
         mock_create_invoices.return_value = []
 
-        for _ in range(10):
-            with patch('invoices.tasks.random.randint') as mock_randint:
-                mock_randint.return_value = 10
-                issue_invoices()
-                mock_randint.assert_called_with(8, 12)
+        with patch('invoices.tasks.random.randint') as mock_randint:
+            mock_randint.return_value = 10
+            issue_invoices()
+            mock_randint.assert_called_with(8, 12)
 
     @patch('invoices.tasks.create_invoices')
     def test_issue_invoices_creates_multiple_records(self, mock_create_invoices):
@@ -51,6 +58,7 @@ class IssueInvoicesTaskTest(TestCase):
             result = issue_invoices()
 
         self.assertEqual(result['created'], 10)
+        self.assertEqual(result['campaign_id'], self.campaign.id)
         self.assertEqual(Invoice.objects.count(), 10)
 
     @patch('invoices.tasks.create_invoices')
@@ -320,3 +328,109 @@ class ProcessInvoiceCreditEdgeCasesTest(TestCase):
         )
 
         self.assertEqual(result['amount'], 1)
+
+
+class IssueInvoicesCampaignTest(TestCase):
+    """Tests for invoice issuance with campaign logic."""
+
+    def test_issue_invoices_no_active_campaign(self):
+        """Task should skip when no active campaign exists."""
+        result = issue_invoices()
+
+        self.assertTrue(result['skipped'])
+        self.assertEqual(result['reason'], 'no_active_campaign')
+        self.assertEqual(Invoice.objects.count(), 0)
+
+    def test_issue_invoices_inactive_campaign(self):
+        """Task should skip when campaign is inactive."""
+        InvoiceCampaign.objects.create(is_active=False)
+
+        result = issue_invoices()
+
+        self.assertTrue(result['skipped'])
+        self.assertEqual(result['reason'], 'no_active_campaign')
+
+    @patch('invoices.tasks.create_invoices')
+    def test_issue_invoices_max_executions_reached(self, mock_create_invoices):
+        """Task should deactivate campaign when max executions reached."""
+        campaign = InvoiceCampaign.objects.create(
+            max_executions=3,
+            execution_count=3,
+            is_active=True
+        )
+
+        result = issue_invoices()
+
+        campaign.refresh_from_db()
+        self.assertTrue(result['skipped'])
+        self.assertEqual(result['reason'], 'max_executions_reached')
+        self.assertFalse(campaign.is_active)
+        mock_create_invoices.assert_not_called()
+
+    @patch('invoices.tasks.create_invoices')
+    def test_issue_invoices_increments_counter(self, mock_create_invoices):
+        """Task should increment execution counter after success."""
+        campaign = InvoiceCampaign.objects.create(
+            max_executions=8,
+            execution_count=0,
+            is_active=True
+        )
+        mock_create_invoices.return_value = []
+
+        with patch('invoices.tasks.random.randint', return_value=8):
+            issue_invoices()
+
+        campaign.refresh_from_db()
+        self.assertEqual(campaign.execution_count, 1)
+
+    @patch('invoices.tasks.create_invoices')
+    def test_issue_invoices_deactivates_on_last_execution(self, mock_create_invoices):
+        """Campaign should deactivate after last execution."""
+        campaign = InvoiceCampaign.objects.create(
+            max_executions=8,
+            execution_count=7,
+            is_active=True
+        )
+        mock_create_invoices.return_value = []
+
+        with patch('invoices.tasks.random.randint', return_value=8):
+            issue_invoices()
+
+        campaign.refresh_from_db()
+        self.assertEqual(campaign.execution_count, 8)
+        self.assertFalse(campaign.is_active)
+
+    @patch('invoices.tasks.create_invoices')
+    def test_issue_invoices_uses_most_recent_active_campaign(self, mock_create_invoices):
+        """Task should use the most recent active campaign (ordered by -started_at)."""
+        InvoiceCampaign.objects.create(is_active=False)
+        InvoiceCampaign.objects.create(is_active=True)
+        most_recent_campaign = InvoiceCampaign.objects.create(is_active=True)
+
+        mock_create_invoices.return_value = []
+
+        with patch('invoices.tasks.random.randint', return_value=8):
+            result = issue_invoices()
+
+        self.assertEqual(result['campaign_id'], most_recent_campaign.id)
+
+    @patch('invoices.tasks.create_invoices')
+    def test_issue_invoices_full_campaign_cycle(self, mock_create_invoices):
+        """Test complete campaign cycle of 8 executions."""
+        campaign = InvoiceCampaign.objects.create(
+            max_executions=8,
+            is_active=True
+        )
+        mock_create_invoices.return_value = []
+
+        for i in range(8):
+            with patch('invoices.tasks.random.randint', return_value=8):
+                result = issue_invoices()
+            self.assertEqual(result['execution'], i + 1)
+
+        campaign.refresh_from_db()
+        self.assertFalse(campaign.is_active)
+        self.assertEqual(campaign.execution_count, 8)
+
+        result = issue_invoices()
+        self.assertTrue(result['skipped'])

@@ -1,5 +1,5 @@
 from django.test import TestCase
-from invoices.models import Invoice, Transfer, WebhookEvent
+from invoices.models import Invoice, Transfer, WebhookEvent, InvoiceCampaign
 
 
 class InvoiceModelTest(TestCase):
@@ -89,3 +89,73 @@ class WebhookEventModelTest(TestCase):
             payload={}
         )
         self.assertEqual(str(event), 'Event event-123 - invoice')
+
+
+class InvoiceCampaignModelTest(TestCase):
+
+    def test_create_campaign(self):
+        campaign = InvoiceCampaign.objects.create()
+        self.assertTrue(campaign.is_active)
+        self.assertEqual(campaign.execution_count, 0)
+        self.assertEqual(campaign.max_executions, 8)
+
+    def test_campaign_str(self):
+        campaign = InvoiceCampaign.objects.create(
+            execution_count=3,
+            max_executions=8
+        )
+        self.assertEqual(str(campaign), f'Campaign {campaign.id} - 3/8 executions')
+
+    def test_increment_and_check_success(self):
+        campaign = InvoiceCampaign.objects.create(
+            execution_count=0,
+            max_executions=8
+        )
+        result = campaign.increment_and_check()
+
+        self.assertTrue(result)
+        self.assertEqual(campaign.execution_count, 1)
+        self.assertTrue(campaign.is_active)
+
+    def test_increment_and_check_deactivates_at_max(self):
+        campaign = InvoiceCampaign.objects.create(
+            execution_count=7,
+            max_executions=8
+        )
+        result = campaign.increment_and_check()
+
+        self.assertTrue(result)
+        self.assertEqual(campaign.execution_count, 8)
+        self.assertFalse(campaign.is_active)
+
+    def test_increment_and_check_fails_when_inactive(self):
+        campaign = InvoiceCampaign.objects.create(
+            is_active=False,
+            execution_count=0
+        )
+        result = campaign.increment_and_check()
+
+        self.assertFalse(result)
+        self.assertEqual(campaign.execution_count, 0)
+
+    def test_increment_and_check_fails_at_max(self):
+        campaign = InvoiceCampaign.objects.create(
+            execution_count=8,
+            max_executions=8
+        )
+        result = campaign.increment_and_check()
+
+        self.assertFalse(result)
+        self.assertEqual(campaign.execution_count, 8)
+
+    def test_campaign_custom_max_executions(self):
+        campaign = InvoiceCampaign.objects.create(max_executions=16)
+        self.assertEqual(campaign.max_executions, 16)
+
+    def test_campaign_ordering(self):
+        campaign1 = InvoiceCampaign.objects.create()
+        campaign2 = InvoiceCampaign.objects.create()
+
+        campaigns = list(InvoiceCampaign.objects.all())
+        self.assertEqual(campaigns[0], campaign2)
+        self.assertEqual(campaigns[1], campaign1)
