@@ -124,6 +124,8 @@ class TransferViewSetTest(APITestCase):
             f'/api/transfers/{self.transfer.id}/',
             HTTP_X_API_KEY=self.api_key
         )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('invoice', response.data)
         self.assertEqual(response.data['invoice'], self.invoice.id)
 
 

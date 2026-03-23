@@ -3,14 +3,12 @@ import starkbank
 from rest_framework import viewsets
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-
 from .models import Invoice, Transfer, WebhookEvent
 from .serializers import InvoiceSerializer, TransferSerializer
 from .services import get_starkbank_project
 from .tasks import process_invoice_credit
 from .exceptions import MissingSignatureError, InvalidSignatureError, WebhookProcessingError
-from .authentication import APIKeyAuthentication
+from .authentication import APIKeyAuthentication, HasValidAPIKey
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +18,7 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Invoice.objects.all()
     serializer_class = InvoiceSerializer
     authentication_classes = [APIKeyAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasValidAPIKey]
 
 
 class TransferViewSet(viewsets.ReadOnlyModelViewSet):
@@ -28,7 +26,7 @@ class TransferViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Transfer.objects.all()
     serializer_class = TransferSerializer
     authentication_classes = [APIKeyAuthentication]
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasValidAPIKey]
 
 
 class WebhookCallbackView(APIView):
