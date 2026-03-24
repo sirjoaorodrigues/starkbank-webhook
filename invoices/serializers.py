@@ -5,16 +5,16 @@ from .models import Invoice, Transfer, WebhookEvent
 class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
-        fields = '__all__'
+        fields = ['id', 'starkbank_id', 'amount', 'name', 'status', 'fee', 'created_at', 'updated_at']
 
 
 class TransferSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transfer
-        fields = '__all__'
+        fields = ['id', 'starkbank_id', 'invoice', 'amount', 'status', 'created_at', 'updated_at']
 
 
 class WebhookEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = WebhookEvent
-        fields = '__all__'
+        fields = ['id', 'event_id', 'event_type', 'processed', 'created_at']

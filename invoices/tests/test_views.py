@@ -135,7 +135,7 @@ class WebhookCallbackTest(APITestCase):
     @patch('invoices.views.get_starkbank_project')
     def test_webhook_without_signature(self, mock_get_project):
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json'
         )
@@ -149,7 +149,7 @@ class WebhookCallbackTest(APITestCase):
         mock_parse.side_effect = starkbank.error.InvalidSignatureError('Invalid signature')
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='invalid-signature'
@@ -172,7 +172,7 @@ class WebhookCallbackTest(APITestCase):
         mock_parse.return_value = mock_event
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='valid-signature'
@@ -200,7 +200,7 @@ class WebhookCallbackTest(APITestCase):
         mock_parse.return_value = mock_event
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='valid-signature'
@@ -232,7 +232,7 @@ class WebhookCallbackTest(APITestCase):
         mock_parse.return_value = mock_event
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='valid-signature'
@@ -252,7 +252,7 @@ class WebhookCallbackTest(APITestCase):
         mock_parse.return_value = mock_event
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='valid-signature'
@@ -281,7 +281,7 @@ class WebhookCallbackTest(APITestCase):
         mock_parse.return_value = mock_event
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='valid-signature'
@@ -304,7 +304,7 @@ class WebhookCallbackTest(APITestCase):
         mock_parse.return_value = mock_event
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='valid-signature'
@@ -313,7 +313,7 @@ class WebhookCallbackTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         event = WebhookEvent.objects.get(event_id='new-event-123')
         self.assertEqual(event.event_type, 'boleto')
-        self.assertFalse(event.processed)
+        self.assertTrue(event.processed)
 
 
 class WebhookIPWhitelistTest(APITestCase):
@@ -325,7 +325,7 @@ class WebhookIPWhitelistTest(APITestCase):
         mock_settings.WEBHOOK_IP_WHITELIST = ['1.2.3.4', '5.6.7.8']
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_DIGITAL_SIGNATURE='valid-signature',
@@ -341,7 +341,7 @@ class WebhookIPWhitelistTest(APITestCase):
         mock_settings.WEBHOOK_IP_WHITELIST = ['127.0.0.1', '5.6.7.8']
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             REMOTE_ADDR='127.0.0.1'
@@ -357,7 +357,7 @@ class WebhookIPWhitelistTest(APITestCase):
         mock_settings.WEBHOOK_IP_WHITELIST = []
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             REMOTE_ADDR='9.9.9.9'
@@ -373,7 +373,7 @@ class WebhookIPWhitelistTest(APITestCase):
         mock_settings.WEBHOOK_IP_WHITELIST = ['']
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             REMOTE_ADDR='9.9.9.9'
@@ -389,7 +389,7 @@ class WebhookIPWhitelistTest(APITestCase):
         mock_settings.WEBHOOK_IP_WHITELIST = ['10.0.0.1']
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_X_FORWARDED_FOR='192.168.1.1, 10.0.0.1',
@@ -404,7 +404,7 @@ class WebhookIPWhitelistTest(APITestCase):
         mock_settings.WEBHOOK_IP_WHITELIST = ['10.0.0.1']
 
         response = self.client.post(
-            '/api/webhook/',
+            '/api/webhook',
             data={'event': 'test'},
             format='json',
             HTTP_X_FORWARDED_FOR='10.0.0.1, 192.168.1.1',

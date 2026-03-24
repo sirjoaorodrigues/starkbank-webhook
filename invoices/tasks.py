@@ -2,6 +2,7 @@ import random
 import logging
 from celery import shared_task
 from django.conf import settings
+from django.db import transaction
 from .models import Invoice, Transfer, InvoiceCampaign
 from .services import create_invoices, create_transfer
 
@@ -67,9 +68,6 @@ def process_invoice_credit(invoice_id: str, amount: int, fee: int):
 
     try:
         invoice = Invoice.objects.get(starkbank_id=invoice_id)
-        invoice.status = Invoice.Status.PAID
-        invoice.fee = fee
-        invoice.save()
 
         transfer_amount = amount - fee
         if transfer_amount <= 0:
@@ -78,12 +76,17 @@ def process_invoice_credit(invoice_id: str, amount: int, fee: int):
 
         sb_transfer = create_transfer(transfer_amount, invoice_id)
 
-        Transfer.objects.create(
-            starkbank_id=sb_transfer.id,
-            invoice=invoice,
-            amount=transfer_amount,
-            status=Transfer.Status.PROCESSING
-        )
+        with transaction.atomic():
+            invoice.status = Invoice.Status.PAID
+            invoice.fee = fee
+            invoice.save()
+
+            Transfer.objects.create(
+                starkbank_id=sb_transfer.id,
+                invoice=invoice,
+                amount=transfer_amount,
+                status=Transfer.Status.PROCESSING
+            )
 
         logger.info(f'Transfer {sb_transfer.id} created for invoice {invoice_id}')
         return {'transfer_id': sb_transfer.id, 'amount': transfer_amount}

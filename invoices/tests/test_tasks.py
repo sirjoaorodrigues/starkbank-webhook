@@ -259,7 +259,8 @@ class ProcessInvoiceCreditTaskTest(TestCase):
         self.assertEqual(Transfer.objects.count(), 0)
 
     @patch('invoices.tasks.create_transfer')
-    def test_process_invoice_credit_invoice_still_updated_on_transfer_error(self, mock_create_transfer):
+    def test_process_invoice_credit_invoice_not_updated_on_transfer_error(self, mock_create_transfer):
+        """Invoice should NOT be updated if transfer creation fails (atomic transaction)."""
         mock_create_transfer.side_effect = Exception('Transfer API Error')
 
         with self.assertRaises(Exception):
@@ -270,8 +271,8 @@ class ProcessInvoiceCreditTaskTest(TestCase):
             )
 
         self.invoice.refresh_from_db()
-        self.assertEqual(self.invoice.status, Invoice.Status.PAID)
-        self.assertEqual(self.invoice.fee, 500)
+        self.assertEqual(self.invoice.status, Invoice.Status.CREATED)
+        self.assertIsNone(self.invoice.fee)
 
 
 class ProcessInvoiceCreditEdgeCasesTest(TestCase):

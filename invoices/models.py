@@ -1,4 +1,5 @@
-from django.db import models
+from django.db import models, transaction
+from django.db.models import F
 
 
 class InvoiceCampaign(models.Model):
@@ -16,14 +17,29 @@ class InvoiceCampaign(models.Model):
         return f'Campaign {self.id} - {self.execution_count}/{self.max_executions} executions'
 
     def increment_and_check(self):
-        """Increment counter and deactivate if max reached. Returns True if was executed."""
+        """Increment counter and deactivate if max reached. Returns True if was executed.
+
+        Uses atomic update with F() expression to prevent race conditions.
+        """
         if not self.is_active or self.execution_count >= self.max_executions:
             return False
 
-        self.execution_count += 1
-        if self.execution_count >= self.max_executions:
-            self.is_active = False
-        self.save()
+        with transaction.atomic():
+            updated = InvoiceCampaign.objects.filter(
+                pk=self.pk,
+                is_active=True,
+                execution_count__lt=F('max_executions')
+            ).update(execution_count=F('execution_count') + 1)
+
+            if not updated:
+                return False
+
+            self.refresh_from_db()
+
+            if self.execution_count >= self.max_executions:
+                InvoiceCampaign.objects.filter(pk=self.pk).update(is_active=False)
+                self.is_active = False
+
         return True
 
 

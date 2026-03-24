@@ -128,6 +128,8 @@ class WebhookCallbackView(APIView):
 
         if event.subscription == 'invoice' and hasattr(event.log, 'invoice'):
             self._handle_invoice_event(event)
+        else:
+            WebhookEvent.objects.filter(event_id=event.id).update(processed=True)
 
     @staticmethod
     def _handle_invoice_event(event):
@@ -143,4 +145,4 @@ class WebhookCallbackView(APIView):
                 fee=invoice.fee or 0
             )
 
-            WebhookEvent.objects.filter(event_id=event.id).update(processed=True)
+        WebhookEvent.objects.filter(event_id=event.id).update(processed=True)

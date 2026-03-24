@@ -8,6 +8,5 @@ router.register(r'transfers', TransferViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('webhook/', WebhookCallbackView.as_view(), name='webhook-callback'), # Not Used
-    path('webhook', WebhookCallbackView.as_view(), name='webhook-callback-no-slash'),
+    path('webhook', WebhookCallbackView.as_view(), name='webhook-callback'),
 ]

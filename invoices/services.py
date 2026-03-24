@@ -1,6 +1,7 @@
 import random
 import secrets
 import starkbank
+from functools import lru_cache
 from django.conf import settings
 from faker import Faker
 from rest_framework import authentication, exceptions, permissions
@@ -13,10 +14,19 @@ fake = Faker('pt_BR')
 # Stark Bank Services
 # =============================================================================
 
-def get_starkbank_project():
-    """Initialize and return Stark Bank project."""
+@lru_cache(maxsize=1)
+def _load_private_key():
+    """Load private key from file (cached)."""
     with open(settings.STARKBANK_PRIVATE_KEY_PATH, 'r') as f:
-        private_key = f.read()
+        return f.read()
+
+
+def get_starkbank_project():
+    """Initialize and return Stark Bank project.
+
+    Uses cached private key to avoid repeated file I/O.
+    """
+    private_key = _load_private_key()
 
     project = starkbank.Project(
         environment=settings.STARKBANK_ENVIRONMENT,
