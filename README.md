@@ -11,6 +11,7 @@ Sistema de integração com a API do Stark Bank para emissão automatizada de in
 - [Pre-requisitos](#pre-requisitos)
 - [Configuracao](#configuracao)
 - [Como Subir o Ambiente](#como-subir-o-ambiente)
+- [Deploy em Producao (VPS)](#deploy-em-producao-vps)
 - [Endpoints da API](#endpoints-da-api)
 - [Celery e Tasks](#celery-e-tasks)
 - [Testes](#testes)
@@ -227,6 +228,7 @@ cp .env-example .env
 DEBUG=True
 SECRET_KEY=sua-chave-secreta-aqui
 ALLOWED_HOSTS=localhost,127.0.0.1,seu-dominio.com
+CSRF_TRUSTED_ORIGINS=https://seu-dominio.com
 
 # Database
 DB_NAME=starkbank_db
@@ -248,6 +250,7 @@ CELERY_RETRY_MAX=5
 STARKBANK_ENVIRONMENT=sandbox
 STARKBANK_PROJECT_ID=seu-project-id
 STARKBANK_PRIVATE_KEY_PATH=/app/keys/private-key.pem
+STARKBANK_INVOICE_EXPIRATION_HOURS=12
 
 # Transfer Destination Account
 TRANSFER_BANK_CODE=20018183
@@ -332,6 +335,120 @@ docker compose down
 
 # Remover volumes (dados do banco)
 docker compose down -v
+```
+
+---
+
+## Deploy em Producao (VPS)
+
+### Arquitetura de Deploy
+
+O deploy utiliza o Nginx da VPS como reverse proxy, fazendo proxy para os containers Docker:
+
+```
+Internet → Nginx (VPS:80/443) → Django Container (8000)
+```
+
+### 1. Configurar DNS
+
+Aponte seu dominio para o IP da VPS no painel do seu provedor de DNS.
+
+### 2. Instalar Nginx e Certbot na VPS
+
+```bash
+sudo apt update
+sudo apt install nginx certbot python3-certbot-nginx
+```
+
+### 3. Criar arquivo de configuracao do Nginx
+
+```bash
+sudo nano /etc/nginx/sites-available/seu-dominio.com
+```
+
+Cole o conteudo (substitua `seu-dominio.com` pelo seu dominio):
+
+```nginx
+server {
+    listen 80;
+    server_name seu-dominio.com www.seu-dominio.com;
+    client_max_body_size 50M;
+
+    location /static/ {
+        alias /caminho/do/projeto/staticfiles/;
+    }
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 4. Ativar o site e gerar certificado SSL
+
+```bash
+# Criar link simbolico
+sudo ln -s /etc/nginx/sites-available/seu-dominio.com /etc/nginx/sites-enabled/
+
+# Testar configuracao
+sudo nginx -t
+
+# Recarregar Nginx
+sudo systemctl reload nginx
+
+# Gerar certificado SSL com Let's Encrypt
+sudo certbot --nginx -d seu-dominio.com
+```
+
+### 5. Subir a aplicacao
+
+```bash
+# Clonar o repositorio
+git clone <repository-url>
+cd starkbank-webhook
+
+# Configurar variaveis de ambiente
+cp .env-example .env
+nano .env  # Editar com suas configuracoes
+
+# Subir containers
+docker compose up -d --build
+
+# Rodar migrations
+docker compose exec web python manage.py migrate
+
+# Coletar arquivos estaticos
+docker compose exec web python manage.py collectstatic --noinput
+
+# Copiar estaticos para o host (para o Nginx servir)
+docker compose cp web:/app/staticfiles/. ./staticfiles/
+
+# Criar superusuario
+docker compose exec web python manage.py createsuperuser
+
+# Iniciar campanha
+docker compose exec web python manage.py start_campaign
+```
+
+### 6. Configurar webhook no Stark Bank
+
+No painel do Stark Bank, configure a URL do webhook:
+
+```
+https://seu-dominio.com/api/webhook/
+```
+
+### Permissoes dos Arquivos Estaticos
+
+Se os estaticos nao carregarem, verifique as permissoes:
+
+```bash
+# Dar permissao de leitura para o Nginx
+chmod -R 755 /caminho/do/projeto/staticfiles/
 ```
 
 ---
