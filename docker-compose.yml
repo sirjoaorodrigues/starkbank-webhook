@@ -41,7 +41,7 @@ services:
 
   celery:
     build: .
-    command: celery -A starkbank_webhook worker -l info
+    command: celery -A core worker -l info
     volumes:
       - .:/app
     env_file:
@@ -54,7 +54,7 @@ services:
 
   celery-beat:
     build: .
-    command: celery -A starkbank_webhook beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - .:/app
     env_file:
