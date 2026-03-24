@@ -27,18 +27,31 @@ def get_starkbank_project():
     return project
 
 
-def create_invoices(count: int) -> list:
+def create_invoices(count: int, campaign_id: int = None) -> list:
     """Create random invoices in Stark Bank."""
     get_starkbank_project()
 
+    expiration_seconds = settings.INVOICE_EXPIRATION_HOURS * 3600
+
     invoices = []
-    for _ in range(count):
+    for i in range(count):
+        amount = random.randint(1000, 100000)
+        name = fake.name()
+
+        tags = ['auto-generated', 'starkbank-challenge']
+        if campaign_id:
+            tags.append(f'campaign-{campaign_id}')
+
         invoice = starkbank.Invoice(
-            amount=random.randint(1000, 100000),
-            name=fake.name(),
+            amount=amount,
+            name=name,
             tax_id=fake.cpf(),
-            due=None,
-            expiration=3600 * 24 * 2,
+            expiration=expiration_seconds,
+            tags=tags,
+            descriptions=[
+                {'key': 'Product', 'value': f'Invoice #{i + 1} of {count}'},
+                {'key': 'Origin', 'value': 'StarkBank Challenge - Auto Generated'},
+            ],
         )
         invoices.append(invoice)
 

@@ -42,6 +42,16 @@ class IssueInvoicesTaskTest(TestCase):
             mock_randint.assert_called_with(8, 12)
 
     @patch('invoices.tasks.create_invoices')
+    def test_issue_invoices_passes_campaign_id(self, mock_create_invoices):
+        """Task should pass campaign_id to create_invoices."""
+        mock_create_invoices.return_value = []
+
+        with patch('invoices.tasks.random.randint', return_value=8):
+            issue_invoices()
+
+        mock_create_invoices.assert_called_once_with(8, campaign_id=self.campaign.id)
+
+    @patch('invoices.tasks.create_invoices')
     def test_issue_invoices_creates_multiple_records(self, mock_create_invoices):
         mock_invoices = []
         for i in range(10):

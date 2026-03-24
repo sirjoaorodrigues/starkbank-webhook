@@ -33,7 +33,7 @@ def issue_invoices():
     logger.info(f'Campaign {campaign.id}: Creating {count} invoices (execution {campaign.execution_count + 1}/{campaign.max_executions})...')
 
     try:
-        starkbank_invoices = create_invoices(count)
+        starkbank_invoices = create_invoices(count, campaign_id=campaign.id)
 
         for sb_invoice in starkbank_invoices:
             Invoice.objects.create(
