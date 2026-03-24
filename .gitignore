@@ -24,7 +24,6 @@ staticfiles/
 *.swo
 
 # Keys
-keys/
 *.pem
 
 # Docker
