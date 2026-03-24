@@ -188,4 +188,18 @@ class CreateInvoicesTest(TestCase):
         call_kwargs = mock_invoice_class.call_args[1]
         descriptions = call_kwargs['descriptions']
         product_desc = next(d for d in descriptions if d['key'] == 'Product')
-        self.assertIn('5 of 5', product_desc['value'])
+        self.assertIn('5/5', product_desc['value'])
+
+    @patch('invoices.services.starkbank.Invoice')
+    @patch('invoices.services.starkbank.invoice.create')
+    @patch('invoices.services.get_starkbank_project')
+    def test_create_invoices_description_max_20_chars(self, mock_get_project, mock_create, mock_invoice_class):
+        from invoices.services import create_invoices
+
+        mock_create.return_value = []
+        create_invoices(count=1)
+
+        call_kwargs = mock_invoice_class.call_args[1]
+        descriptions = call_kwargs['descriptions']
+        for desc in descriptions:
+            self.assertLessEqual(len(desc['value']), 20, f"Description value '{desc['value']}' exceeds 20 chars")

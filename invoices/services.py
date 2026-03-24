@@ -49,8 +49,8 @@ def create_invoices(count: int, campaign_id: int = None) -> list:
             expiration=expiration_seconds,
             tags=tags,
             descriptions=[
-                {'key': 'Product', 'value': f'Invoice #{i + 1} of {count}'},
-                {'key': 'Origin', 'value': 'StarkBank Challenge - Auto Generated'},
+                {'key': 'Product', 'value': f'Invoice #{i + 1}/{count}'},
+                {'key': 'Origin', 'value': 'Auto Generated'},
             ],
         )
         invoices.append(invoice)
