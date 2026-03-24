@@ -27,11 +27,23 @@ def issue_invoices():
     if campaign.execution_count >= campaign.max_executions:
         campaign.is_active = False
         campaign.save()
-        logger.info('Campaign completed - max executions reached')
+        logger.info(
+            'Campaign completed - max executions reached',
+            extra={'campaign_id': campaign.id, 'max_executions': campaign.max_executions}
+        )
         return {'skipped': True, 'reason': 'max_executions_reached'}
 
     count = random.randint(8, 12)
-    logger.info(f'Campaign {campaign.id}: Creating {count} invoices (execution {campaign.execution_count + 1}/{campaign.max_executions})...')
+    execution_number = campaign.execution_count + 1
+    logger.info(
+        'Starting invoice creation batch',
+        extra={
+            'campaign_id': campaign.id,
+            'invoice_count': count,
+            'execution': execution_number,
+            'max_executions': campaign.max_executions
+        }
+    )
 
     try:
         starkbank_invoices = create_invoices(count, campaign_id=campaign.id)
@@ -44,14 +56,34 @@ def issue_invoices():
                 tax_id=sb_invoice.tax_id,
                 status=Invoice.Status.CREATED
             )
-            logger.info(f'Invoice {sb_invoice.id} created for {sb_invoice.name}')
+            logger.info(
+                'Invoice created',
+                extra={
+                    'invoice_id': sb_invoice.id,
+                    'amount': sb_invoice.amount,
+                    'campaign_id': campaign.id
+                }
+            )
 
         campaign.increment_and_check()
-        logger.info(f'Successfully created {count} invoices. Campaign progress: {campaign.execution_count}/{campaign.max_executions}')
+        logger.info(
+            'Invoice batch completed',
+            extra={
+                'campaign_id': campaign.id,
+                'created_count': count,
+                'execution': campaign.execution_count,
+                'max_executions': campaign.max_executions,
+                'campaign_active': campaign.is_active
+            }
+        )
         return {'created': count, 'campaign_id': campaign.id, 'execution': campaign.execution_count}
 
     except Exception as e:
-        logger.error(f'Error creating invoices: {e}')
+        logger.error(
+            'Error creating invoices',
+            extra={'campaign_id': campaign.id, 'error': str(e)},
+            exc_info=True
+        )
         raise
 
 
@@ -64,14 +96,18 @@ def issue_invoices():
 )
 def process_invoice_credit(invoice_id: str, amount: int, fee: int):
     """Process a paid invoice and create a transfer."""
-    logger.info(f'Processing invoice credit: {invoice_id}, amount: {amount}, fee: {fee}')
+    log_context = {'invoice_id': invoice_id, 'amount': amount, 'fee': fee}
+    logger.info('Processing invoice credit', extra=log_context)
 
     try:
         invoice = Invoice.objects.get(starkbank_id=invoice_id)
 
         transfer_amount = amount - fee
         if transfer_amount <= 0:
-            logger.warning(f'Transfer amount is zero or negative for invoice {invoice_id}')
+            logger.warning(
+                'Transfer amount is zero or negative',
+                extra={**log_context, 'transfer_amount': transfer_amount}
+            )
             return {'error': 'Transfer amount is zero or negative'}
 
         sb_transfer = create_transfer(transfer_amount, invoice_id)
@@ -88,12 +124,24 @@ def process_invoice_credit(invoice_id: str, amount: int, fee: int):
                 status=Transfer.Status.PROCESSING
             )
 
-        logger.info(f'Transfer {sb_transfer.id} created for invoice {invoice_id}')
+        logger.info(
+            'Transfer created successfully',
+            extra={
+                'invoice_id': invoice_id,
+                'transfer_id': sb_transfer.id,
+                'transfer_amount': transfer_amount,
+                'fee': fee
+            }
+        )
         return {'transfer_id': sb_transfer.id, 'amount': transfer_amount}
 
     except Invoice.DoesNotExist:
-        logger.error(f'Invoice {invoice_id} not found in database')
+        logger.error('Invoice not found in database', extra=log_context)
         raise
     except Exception as e:
-        logger.error(f'Error processing invoice credit: {e}')
+        logger.error(
+            'Error processing invoice credit',
+            extra={**log_context, 'error': str(e)},
+            exc_info=True
+        )
         raise

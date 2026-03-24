@@ -75,7 +75,7 @@ class WebhookCallbackView(APIView):
         except (MissingSignatureError, InvalidSignatureError, IPNotAllowedError):
             raise
         except Exception as e:
-            logger.error(f'Error processing webhook: {e}')
+            logger.error('Error processing webhook', extra={'error': str(e)}, exc_info=True)
             raise WebhookProcessingError()
 
     @staticmethod
@@ -92,7 +92,10 @@ class WebhookCallbackView(APIView):
 
         client_ip = self._get_client_ip(request)
         if client_ip not in whitelist:
-            logger.warning(f'Webhook request from non-whitelisted IP: {client_ip}')
+            logger.warning(
+                'Webhook request from non-whitelisted IP',
+                extra={'client_ip': client_ip, 'whitelist': whitelist}
+            )
             raise IPNotAllowedError()
 
     @staticmethod
@@ -123,7 +126,10 @@ class WebhookCallbackView(APIView):
         )
 
         if not created:
-            logger.info(f'Event {event.id} already processed')
+            logger.info(
+                'Duplicate event ignored',
+                extra={'event_id': event.id, 'event_type': event.subscription}
+            )
             return
 
         if event.subscription == 'invoice' and hasattr(event.log, 'invoice'):
@@ -137,7 +143,15 @@ class WebhookCallbackView(APIView):
         invoice = invoice_log.invoice
 
         if invoice_log.type == 'credited':
-            logger.info(f'Invoice {invoice.id} credited: amount={invoice.amount}, fee={invoice.fee}')
+            logger.info(
+                'Invoice credited - scheduling transfer',
+                extra={
+                    'event_id': event.id,
+                    'invoice_id': invoice.id,
+                    'amount': invoice.amount,
+                    'fee': invoice.fee
+                }
+            )
 
             process_invoice_credit.delay(
                 invoice_id=str(invoice.id),
