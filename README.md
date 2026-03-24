@@ -185,14 +185,23 @@ starkbank_webhook/
 
 ### Gerando Chaves do Stark Bank
 
-```bash
-# Gerar par de chaves ECDSA
-openssl ecparam -name secp256k1 -genkey -noout -out private-key.pem
-openssl ec -in private-key.pem -pubout -out public-key.pem
+O Stark Bank utiliza chaves ECDSA com a curva secp256k1 para autenticacao. Siga os passos abaixo para gerar seu par de chaves:
 
-# A chave publica deve ser cadastrada no Stark Bank
-cat public-key.pem
+```bash
+# 1. Gerar chave privada ECDSA (curva secp256k1)
+openssl ecparam -name secp256k1 -genkey -out privateKey.pem
+
+# 2. Extrair chave publica da chave privada
+openssl ec -in privateKey.pem -pubout -out publicKey.pem
+
+# 3. Visualizar a chave publica para cadastrar no Stark Bank
+cat publicKey.pem
 ```
+
+**Importante:**
+- A chave **privada** (`privateKey.pem`) deve ser mantida em segredo e usada na sua aplicacao
+- A chave **publica** (`publicKey.pem`) deve ser cadastrada no painel do Stark Bank ao criar o Project
+- Copie o arquivo `privateKey.pem` para a pasta `keys/` do projeto e configure o path no `.env`
 
 ---
 
